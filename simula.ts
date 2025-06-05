@@ -1,7 +1,6 @@
 import { Kafka, Producer, Consumer } from 'kafkajs';
 import { v4 as uuidv4 } from 'uuid';
 
-// Tipos para o sistema de ingressos
 interface Ticket {
   id: string;
   name: string;
@@ -18,7 +17,6 @@ interface ProcessedTicket {
   processedAt: string;
 }
 
-// Producer - Simula compras de ingressos
 class TicketPurchaseProducer {
   private kafka: Kafka;
   private producer: Producer;
@@ -28,7 +26,6 @@ class TicketPurchaseProducer {
       clientId: 'ticket-purchase-producer',
       brokers: ['localhost:9092']
     });
-    
     this.producer = this.kafka.producer();
   }
 
@@ -38,7 +35,6 @@ class TicketPurchaseProducer {
   }
 
   async simulatePurchase(customerData: any): Promise<boolean> {
-    // Cria a compra
     const purchase: Ticket = {
       id: uuidv4(),
       name: customerData.name,
@@ -49,7 +45,6 @@ class TicketPurchaseProducer {
     };
 
     try {
-      // Envia para a fila de processamento
       await this.producer.send({
         topic: 'ticket-purchases',
         messages: [{
@@ -64,7 +59,6 @@ class TicketPurchaseProducer {
       console.log(`Compra enviada para processamento: ${purchase.id}`);
       console.log(`- Cliente: ${purchase.name}`);
       console.log(`- Ingressos: ${purchase.quantity} x R$ ${purchase.price}`);
-      
       return true;
 
     } catch (error) {
@@ -79,7 +73,6 @@ class TicketPurchaseProducer {
   }
 }
 
-// Consumer - Processa as compras
 class TicketProcessingConsumer {
   private kafka: Kafka;
   private consumer: Consumer;
@@ -90,7 +83,6 @@ class TicketProcessingConsumer {
       clientId: 'ticket-processing-consumer',
       brokers: ['localhost:9092']
     });
-    
     this.consumer = this.kafka.consumer({ 
       groupId: 'ticket-processing-group' 
     });
@@ -120,24 +112,18 @@ class TicketProcessingConsumer {
 
   private async processPurchase(purchase: Ticket): Promise<void> {
     console.log(`\nProcessando compra: ${purchase.id}`);
-    
-    // Simula tempo de processamento
     await this.sleep(1000);
 
-    // Verifica disponibilidade
     if (this.availableTickets < purchase.quantity) {
       await this.handleFailedPurchase(purchase, 'Ingressos esgotados');
       return;
     }
 
-    // Processa com sucesso
     await this.handleSuccessfulPurchase(purchase);
   }
 
   private async handleSuccessfulPurchase(purchase: Ticket): Promise<void> {
-    // Reserva os ingressos
     this.availableTickets -= purchase.quantity;
-    
     const processedTicket: ProcessedTicket = {
       id: purchase.id,
       status: 'CONFIRMED',
@@ -165,7 +151,6 @@ class TicketProcessingConsumer {
     console.log(processedTicket);
   }
 
-
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -180,7 +165,6 @@ class TicketProcessingConsumer {
   }
 }
 
-// Simulador de compras
 class TicketPurchaseSimulator {
   private producer: TicketPurchaseProducer;
 
@@ -203,16 +187,13 @@ class TicketPurchaseSimulator {
 
     for (let i = 0; i < count; i++) {
       const customer = customers[Math.floor(Math.random() * customers.length)];
-      const quantity = Math.floor(Math.random() * 3) + 1; // 1-3 ingressos
-      
+      const quantity = Math.floor(Math.random() * 3) + 1;
       const purchaseData = {
         ...customer,
         quantity
       };
 
       await this.producer.simulatePurchase(purchaseData);
-      
-      // Pausa entre compras
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
@@ -222,7 +203,6 @@ class TicketPurchaseSimulator {
   }
 }
 
-// Exemplo de uso
 async function exemploCompleto(): Promise<void> {
   console.log('SISTEMA DE INGRESSOS COM KAFKA');
   console.log('='.repeat(40));
@@ -230,32 +210,25 @@ async function exemploCompleto(): Promise<void> {
   console.log('\nIngressos disponíveis: 10');
   console.log('Preço: R$ 10,00 cada');
 
-  // Inicia o consumer em background
   const consumer = new TicketProcessingConsumer();
   await consumer.connect();
-  
-  // Não aguarda - roda em background
   consumer.startProcessing().catch(console.error);
 
-  // Simula compras
   const simulator = new TicketPurchaseSimulator();
   await simulator.init();
   
   console.log('\nIniciando simulação de compras...\n');
   await simulator.simulateRandomPurchases(8);
   
-  // Aguarda um pouco para processar tudo
   console.log('\nAguardando processamento finalizar...');
   await new Promise(resolve => setTimeout(resolve, 10000));
   
-  // Cleanup
   await simulator.cleanup();
   await consumer.disconnect();
   
   console.log('\nSimulação finalizada!');
 }
 
-// Executar exemplo
 if (require.main === module) {
   exemploCompleto().catch(console.error);
 }
